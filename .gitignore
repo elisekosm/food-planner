@@ -1,0 +1,17 @@
+# Node
+node_modules/
+.env
+
+# VSCode
+.vscode/
+
+# Logs
+*.log
+
+# Build
+/dist/
+/build/
+
+# Serverless
+.netlify/
+.vercel/
