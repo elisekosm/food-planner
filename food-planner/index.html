@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartMealGen</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <h1>SmartMealGen</h1>
+    <form id="meal-form">
+      <label for="diet">Meal Preferences</label>
+      <input type="text" id="diet" name="diet" placeholder="e.g., low red meat, one-pan meals" required>
+      <label for="numMeals">Number of Meals</label>
+      <input type="number" id="numMeals" name="numMeals" min="1" max="7" value="3" required>
+      <label for="servingsPerMeal">Servings per Meal</label>
+      <input type="number" id="servingsPerMeal" name="servingsPerMeal" min="1" max="10" value="2" required>
+      <button type="submit" id="generate-btn">Generate Recipes</button>
+    </form>
+    <div id="loading" class="hidden">Generating recipes...</div>
+    <section id="results" class="hidden">
+      <h2>Generated Recipes and Grocery List</h2>
+      <div id="recipes"></div>
+      <div id="grocery-list"></div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
