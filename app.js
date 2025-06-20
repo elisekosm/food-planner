@@ -7,8 +7,7 @@ const resultsSection = document.getElementById('results');
 const recipesDiv = document.getElementById('recipes');
 const groceryListDiv = document.getElementById('grocery-list');
 
-const OPENAI_API_KEY = window.SMARTMEALGEN_API_KEY || '';
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+const OPENAI_API_URL = '/api/openai-proxy';
 const MODEL = 'gpt-4';
 
 const PROMPT_TEMPLATE = `Generate {numMeals} flavorful, healthy recipes that use minimal red meat. Each meal should take under 1 hour to make and be simple to cook (one-pan preferred). Provide a recipe title, short description, list of ingredients, and cooking instructions. Also, generate a consolidated grocery list for all meals formatted by ingredient type (e.g., produce, protein, spices). Servings: {servingsPerMeal}.`;
@@ -43,8 +42,7 @@ form.addEventListener('submit', async (e) => {
     const response = await fetch(OPENAI_API_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: MODEL,
@@ -92,12 +90,4 @@ function formatRecipes(text) {
 function formatGroceryList(text) {
   if (!text) return '';
   return `<div>${text.replace(/\n/g, '<br>')}</div>`;
-}
-
-// Optionally, allow user to set API key via prompt if not set
-if (!OPENAI_API_KEY) {
-  setTimeout(() => {
-    const key = prompt('Enter your OpenAI API key to use SmartMealGen:');
-    if (key) window.SMARTMEALGEN_API_KEY = key;
-  }, 500);
 }
