@@ -1,6 +1,6 @@
-# SmartMealGen
+# Food Planner
 
-SmartMealGen is a lightweight web app that uses OpenAI's API to generate healthy, flavorful recipes and a consolidated grocery list based on your preferences. It supports both secure serverless proxy mode (for production) and local development mode.
+Food Planner is a lightweight web app that uses OpenAI's API to generate healthy, flavorful recipes and a consolidated grocery list based on your preferences. It supports both secure serverless proxy mode (for production) and local development mode.
 
 ## Features
 - Enter meal preferences (e.g., low red meat, one-pan, quick to make)

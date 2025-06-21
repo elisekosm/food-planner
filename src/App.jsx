@@ -34,23 +34,30 @@ export default function App() {
       .replace('{numMeals}', numMeals)
       .replace('{servingsPerMeal}', servingsPerMeal)
       + ` Preferences: ${allPreferences}`;
+    console.log('[Food Planner] Submitting form with:', { diet, numMeals, servingsPerMeal, allPreferences });
+    console.log('[Food Planner] Prompt:', prompt);
     try {
+      const requestBody = {
+        model: MODEL,
+        messages: [
+          { role: 'system', content: 'You are a helpful meal planner.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7
+      };
+      console.log('[Food Planner] Sending API request:', requestBody);
       const response = await fetch('/api/openai-proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: [
-            { role: 'system', content: 'You are a helpful meal planner.' },
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.7
-        })
+        body: JSON.stringify(requestBody)
       });
+      console.log('[Food Planner] API response status:', response.status);
       if (!response.ok) throw new Error('API error');
       const data = await response.json();
+      console.log('[Food Planner] API response data:', data);
       setResult(data.choices[0].message.content);
     } catch (err) {
+      console.error('[Food Planner] Error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -68,7 +75,7 @@ export default function App() {
 
   return (
     <main className="container">
-      <h1>SmartMealGen</h1>
+      <h1>Food Planner</h1>
       <form onSubmit={handleSubmit} className="form">
         <label htmlFor="diet">Meal Preferences</label>
         <div className="preset-btns">
