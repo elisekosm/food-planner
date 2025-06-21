@@ -27,7 +27,19 @@ app.post('/api/openai-proxy', async (req, res) => {
     if (!prompt) {
       return res.status(400).json({ error: 'No prompt provided' });
     }
-    const model = req.body.model || 'mistralai/Mistral-7B-Instruct-v0.2'; // Default to a popular instruct model
+    // Model selection is now only here in the API
+    // 'MiriFur/gpt2-recipes' - no
+    // 'alexdseo/RecipeBERT' - no
+    // 'meta-llama/Llama-3.1-8B-Instruct'  - slow 
+    // meta-llama/Llama-3.3-70B-Instruct - slow 
+    // mistralai/Mixtral-8x7B-Instruct-v0.1
+    // Gensyn/Qwen2.5-1.5B-Instruct - no 
+    // Gensyn/Qwen2.5-0.5B-Instruct - no 
+    // Qwen/Qwen3-32B 
+    // Qwen/Qwen2.5-Coder-32B-Instruct
+    // deepseek-ai/DeepSeek-R1 - no 
+    const model = 'meta-llama/Llama-3.3-70B-Instruct';
+
     console.log('Proxying request to Hugging Face:', { model, prompt });
     const hfRes = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
       method: 'POST',
@@ -52,6 +64,9 @@ app.post('/api/openai-proxy', async (req, res) => {
       return; // Ensure function exits after sending response
     }
     console.log('Hugging Face response status:', hfRes.status);
+    console.log('Hugging Face response message:', hfRes.message);
+    console.log('Hugging Face response:', hfRes);
+
     // Hugging Face returns an array with generated_text
     if (Array.isArray(data) && data[0]?.generated_text) {
       res.status(200).json({ choices: [{ message: { content: data[0].generated_text } }] });

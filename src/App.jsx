@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import './style.css';
 
 const PRESET_PREFERENCES = 'low red meat, one-pan, quick to make';
-const MODEL = 'flax-community/t5-recipe-generation';
 const PROMPT_TEMPLATE = `Generate {numMeals} flavorful, healthy recipes that use minimal red meat. Each meal should take under 1 hour to make and be simple to cook (one-pan preferred). Provide a recipe title, short description, list of ingredients, and cooking instructions. Also, generate a consolidated grocery list for all meals formatted by ingredient type (e.g., produce, protein, spices). Servings: {servingsPerMeal}.`;
 
 export default function App() {
@@ -38,7 +37,6 @@ export default function App() {
     console.log('[Food Planner] Prompt:', prompt);
     try {
       const requestBody = {
-        model: MODEL,
         inputs: prompt
       };
       console.log('[Food Planner] Sending Hugging Face style API request:', requestBody);
