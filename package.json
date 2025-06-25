@@ -15,14 +15,18 @@
     "babel-loader": "^9.0.0",
     "css-loader": "^6.0.0",
     "dotenv": "^16.5.0",
+    "gh-pages": "^6.3.0",
     "html-webpack-plugin": "^5.0.0",
     "style-loader": "^3.0.0",
     "webpack": "^5.0.0",
     "webpack-cli": "^4.0.0",
     "webpack-dev-server": "^4.0.0"
   },
+  "homepage": "https://elisekosm.github.io/food-planner",
   "scripts": {
     "start": "webpack serve --mode development --open",
-    "build": "webpack --mode production"
+    "build": "webpack --mode production",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   }
 }
