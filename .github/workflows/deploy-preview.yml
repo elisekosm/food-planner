@@ -1,0 +1,44 @@
+name: Deploy PR Preview to GitHub Pages (Test)
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build app
+        run: npm run build
+
+      - name: Deploy PR preview to gh-pages-test
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages-test
+          destination_dir: pr-${{ github.event.pull_request.number }}-test
+          keep_files: true
+
+      - name: Comment PR with preview URL
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: |
+            🚀 Preview: https://elisekosm.github.io/food-planner/pr-${{ github.event.pull_request.number }}-test/
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
