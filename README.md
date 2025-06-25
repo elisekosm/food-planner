@@ -1,4 +1,4 @@
-# Food Planner
+# Food Planner 
 
 Food Planner is a lightweight web app that uses OpenAI's API to generate healthy, flavorful recipes and a consolidated grocery list based on your preferences. It supports both secure serverless proxy mode (for production) and local development mode.
 
