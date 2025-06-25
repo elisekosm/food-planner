@@ -4,6 +4,77 @@ import './style.css';
 const PRESET_PREFERENCES = 'low red meat, one-pan, quick to make';
 const PROMPT_TEMPLATE = `Generate {numMeals} flavorful, healthy recipes that use minimal red meat. Each meal should take under 1 hour to make and be simple to cook (one-pan preferred). Provide a recipe title, short description, list of ingredients, and cooking instructions. Also, generate a consolidated grocery list for all meals formatted by ingredient type (e.g., produce, protein, spices). Servings: {servingsPerMeal}.`;
 
+function parseRecipes(recipesText) {
+  // Robust parser for stubbed LLM response
+  if (!recipesText) return [];
+  // Split on --- lines
+  const recipeBlocks = recipesText.split(/---+/g).map(b => b.trim()).filter(Boolean);
+  return recipeBlocks.filter(b => b.match(/^###/m) && !b.match(/consolidated/i)).map((block, idx) => {
+    // Title
+    const titleMatch = block.match(/^###\s*\*\*(\d+\.\s*)?(.+?)\*\*/m);
+    const title = titleMatch ? titleMatch[2].trim() : `Recipe ${idx+1}`;
+    // Description
+    const descMatch = block.match(/\*\*Description:\*\*\s*(.+)/m);
+    const description = descMatch ? descMatch[1].trim() : '';
+    // Ingredients
+    const ingMatch = block.match(/\*\*Ingredients:\*\*([\s\S]+?)\*\*Instructions:\*\*/m);
+    let ingredients = [];
+    if (ingMatch) {
+      ingredients = ingMatch[1].split(/\n|-/).map(l => l.replace(/^\s*[-•]?\s*/, '').trim()).filter(l => l);
+    }
+    // Instructions
+    const insMatch = block.match(/\*\*Instructions:\*\*([\s\S]+)/m);
+    let instructions = [];
+    if (insMatch) {
+      instructions = insMatch[1].split(/\n\d+\.\s/).map(l => l.replace(/^\d+\.\s*/, '').trim()).filter(l => l);
+    }
+    // Servings (try to extract from description or default to 2)
+    let servings = 2;
+    const servingsMatch = block.match(/serves?\s*(\d+)/i);
+    if (servingsMatch) servings = parseInt(servingsMatch[1]);
+    // Only include recipes with a title and at least one ingredient
+    if (!title || ingredients.length === 0) return null;
+    return { id: idx, title, description, ingredients, instructions, servings, checked: true, expanded: false, currentServings: servings };
+  }).filter(Boolean);
+}
+
+function parseGroceryList(groceryText) {
+  // Parse markdown-style bold section headers (e.g. **Produce:**) and list items
+  if (!groceryText) return [];
+  const lines = groceryText.split('\n');
+  let sections = [], currentSection = null, items = [];
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    // Match section header: **Produce:**
+    const sectionMatch = trimmed.match(/^\*\*([A-Za-z /&()]+):\*\*$/);
+    if (sectionMatch) {
+      if (currentSection && items.length) {
+        sections.push({ section: currentSection, items });
+      }
+      currentSection = sectionMatch[1].trim();
+      items = [];
+    } else if (/^- /.test(trimmed)) {
+      items.push(trimmed.replace(/^- /, '').trim());
+    }
+  });
+  if (currentSection && items.length) {
+    sections.push({ section: currentSection, items });
+  }
+  return sections;
+}
+
+function normalizeIngredient(str) {
+  // Remove quantity, parentheticals, and extra words, lowercase
+  return str
+    .replace(/^[\d\s\/.,()-]+/, '') // remove leading quantity/units
+    .replace(/\([^)]*\)/g, '') // remove parentheticals
+    .replace(/[^a-zA-Z ]/g, '') // remove non-letters
+    .toLowerCase()
+    .replace(/\b(?:of|and|or|to|for|with|optional|fresh|small|medium|large|can|oz|cup|cups|tbsp|tsp|cloves|bunch|slices|slice|pieces|piece|trimmed|diced|minced|rinsed|peeled|deveined|zest|juice|sliced|thinly|drained|rinsed|plus|more|as needed|as desired|as required)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export default function App() {
   const [diet, setDiet] = useState('');
   const [numMeals, setNumMeals] = useState(3);
@@ -11,6 +82,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [recipesState, setRecipesState] = useState([]);
+  const [grocerySections, setGrocerySections] = useState([]);
 
   const handlePreset = (val) => {
     if (!diet.includes(val)) setDiet(diet ? diet + ', ' + val : val);
@@ -65,25 +138,21 @@ export default function App() {
     return { recipes: text.slice(0, idx), grocery: text.slice(idx) };
   }
 
-  const { recipes, grocery } = splitResult(result);
+  React.useEffect(() => {
+    if (result) {
+      const { recipes, grocery } = splitResult(result);
+      const parsedRecipes = parseRecipes(recipes);
+      const parsedGrocery = parseGroceryList(grocery);
+      setRecipesState(parsedRecipes);
+      setGrocerySections(parsedGrocery);
+    }
+  }, [result]);
 
-  // Helper: Parse grocery list into items (skip headers, empty lines)
-  function parseGroceryItems(groceryText) {
-    return groceryText
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line && !line.toLowerCase().includes('grocery list') && !line.endsWith(':'));
+  function handleExpandRecipe(idx) {
+    setRecipesState(rs => rs.map((r, i) => i === idx ? { ...r, expanded: !r.expanded } : r));
   }
-
-  // Handler: Send grocery list to Instacart
-  function handleSendToInstacart() {
-    if (!grocery) return;
-    const items = parseGroceryItems(grocery);
-    // Instacart search URL: https://www.instacart.com/store/partner/search_v3?query=ITEM
-    // We'll join items with commas for a multi-item search
-    const searchQuery = encodeURIComponent(items.join(', '));
-    const url = `https://www.instacart.com/store/partner/search_v3?query=${searchQuery}`;
-    window.open(url, '_blank');
+  function handleServingsChange(idx, val) {
+    setRecipesState(rs => rs.map((r, i) => i === idx ? { ...r, currentServings: val } : r));
   }
 
   return (
@@ -108,48 +177,42 @@ export default function App() {
       {result && (
         <section className="results">
           <h2>Generated Recipes and Grocery List</h2>
-          <div className="recipes">
-            {recipes.split('\n').map((line, i) => <div key={i}>{line}</div>)}
-          </div>
-          {grocery && (
-            <>
-              <div className="grocery-list">
-                {parseGroceryItems(grocery).map((item, i) => (
-                  <div key={item + i} style={{display: 'flex', alignItems: 'center', gap: '0.5em'}}>
-                    <span>{item}</span>
-                    <a
-                      href={`https://www.instacart.com/search?q=${encodeURIComponent(item)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="instacart-link"
-                      style={{fontSize: '0.9em', color: '#22a857', textDecoration: 'underline'}}
-                    >
-                      Instacart
-                    </a>
-                    <a
-                      href={`https://www.walmart.com/search/?query=${encodeURIComponent(item)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="walmart-link"
-                      style={{fontSize: '0.9em', color: '#0071ce', textDecoration: 'underline'}}
-                    >
-                      Walmart
-                    </a>
-                    <a
-                      href={`https://www.aldi.us/search/?q=${encodeURIComponent(item)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="aldi-link"
-                      style={{fontSize: '0.9em', color: '#e6001f', textDecoration: 'underline'}}
-                    >
-                      ALDI
-                    </a>
+          <div className="recipes-list">
+            {recipesState.map((r, i) => (
+              <div key={r.id} className="recipe-card" style={{marginBottom: '2em', paddingBottom: '1em', borderBottom: '1px solid #eee'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'0.5em'}}>
+                  {/* Removed checkbox for recipe selection */}
+                  <span style={{fontWeight:'bold',fontSize:'1.1em'}}>{r.title}</span>
+                  <button onClick={() => handleExpandRecipe(i)} style={{marginLeft:'auto'}}>{r.expanded ? 'Hide' : 'Show'} Details</button>
+                </div>
+                {r.expanded && (
+                  <div className="recipe-details">
+                    <div><em>{r.description}</em></div>
+                    <div>Servings: <input type="number" min={1} value={r.currentServings} onChange={e => handleServingsChange(i, Number(e.target.value))} style={{width:'3em'}} /></div>
+                    <div><strong>Ingredients:</strong><ul>{r.ingredients.map((ing, j) => <li key={j}>{ing}</li>)}</ul></div>
+                    <div><strong>Instructions:</strong><ol>{r.instructions.map((ins, j) => <li key={j}>{ins}</li>)}</ol></div>
                   </div>
-                ))}
+                )}
               </div>
-              <button className="instacart-btn" onClick={handleSendToInstacart} style={{marginTop: '1em'}}>Send to Instacart</button>
-            </>
-          )}
+            ))}
+          </div>
+          <div className="grocery-list">
+            {grocerySections.map((section, i) => (
+              <div key={section.section} style={{marginBottom: '1.5em'}}>
+                <h3 style={{marginBottom: '0.5em', marginTop: i === 0 ? 0 : '1em'}}>{section.section}</h3>
+                <ul style={{marginLeft: '1em'}}>
+                  {section.items.filter(item => item && !item.match(/^[A-Za-z ]+:$/)).map((item, j) => (
+                    <li key={item+j} style={{display:'flex',alignItems:'center',gap:'0.5em',marginBottom:'0.2em'}}>
+                      <span>{item}</span>
+                      <a href={`https://www.instacart.com/search?q=${encodeURIComponent(item)}`} target="_blank" rel="noopener noreferrer" className="instacart-link" style={{fontSize:'0.9em',color:'#22a857',textDecoration:'underline'}}>Instacart</a>
+                      <a href={`https://www.walmart.com/search/?query=${encodeURIComponent(item)}`} target="_blank" rel="noopener noreferrer" className="walmart-link" style={{fontSize:'0.9em',color:'#0071ce',textDecoration:'underline'}}>Walmart</a>
+                      <a href={`https://www.aldi.us/search/?q=${encodeURIComponent(item)}`} target="_blank" rel="noopener noreferrer" className="aldi-link" style={{fontSize:'0.9em',color:'#e6001f',textDecoration:'underline'}}>ALDI</a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </section>
       )}
     </main>
