@@ -23,8 +23,7 @@ jobs:
       - name: Build app
         run: npm run build
 
-      - name: Deploy to GitHub Pages
-        env:
-          CI: true
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run deploy
+      - name: Configure git user
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
