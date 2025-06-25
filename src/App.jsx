@@ -67,6 +67,25 @@ export default function App() {
 
   const { recipes, grocery } = splitResult(result);
 
+  // Helper: Parse grocery list into items (skip headers, empty lines)
+  function parseGroceryItems(groceryText) {
+    return groceryText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line && !line.toLowerCase().includes('grocery list') && !line.endsWith(':'));
+  }
+
+  // Handler: Send grocery list to Instacart
+  function handleSendToInstacart() {
+    if (!grocery) return;
+    const items = parseGroceryItems(grocery);
+    // Instacart search URL: https://www.instacart.com/store/partner/search_v3?query=ITEM
+    // We'll join items with commas for a multi-item search
+    const searchQuery = encodeURIComponent(items.join(', '));
+    const url = `https://www.instacart.com/store/partner/search_v3?query=${searchQuery}`;
+    window.open(url, '_blank');
+  }
+
   return (
     <main className="container">
       <h1>Food Planner</h1>
@@ -92,7 +111,45 @@ export default function App() {
           <div className="recipes">
             {recipes.split('\n').map((line, i) => <div key={i}>{line}</div>)}
           </div>
-          {grocery && <div className="grocery-list">{grocery.split('\n').map((line, i) => <div key={i}>{line}</div>)}</div>}
+          {grocery && (
+            <>
+              <div className="grocery-list">
+                {parseGroceryItems(grocery).map((item, i) => (
+                  <div key={item + i} style={{display: 'flex', alignItems: 'center', gap: '0.5em'}}>
+                    <span>{item}</span>
+                    <a
+                      href={`https://www.instacart.com/search?q=${encodeURIComponent(item)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="instacart-link"
+                      style={{fontSize: '0.9em', color: '#22a857', textDecoration: 'underline'}}
+                    >
+                      Instacart
+                    </a>
+                    <a
+                      href={`https://www.walmart.com/search/?query=${encodeURIComponent(item)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="walmart-link"
+                      style={{fontSize: '0.9em', color: '#0071ce', textDecoration: 'underline'}}
+                    >
+                      Walmart
+                    </a>
+                    <a
+                      href={`https://www.aldi.us/search/?q=${encodeURIComponent(item)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="aldi-link"
+                      style={{fontSize: '0.9em', color: '#e6001f', textDecoration: 'underline'}}
+                    >
+                      ALDI
+                    </a>
+                  </div>
+                ))}
+              </div>
+              <button className="instacart-btn" onClick={handleSendToInstacart} style={{marginTop: '1em'}}>Send to Instacart</button>
+            </>
+          )}
         </section>
       )}
     </main>
