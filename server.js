@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const fs = require('fs');
 const app = express();
 app.use(express.json());
 
@@ -9,73 +10,71 @@ app.use((req, res, next) => {
   next();
 });
 
-app.post('/api/openai-proxy', async (req, res) => {
-  const apiKey = process.env.HUGGING_FACE_API_KEY;
+app.post('/api/chat-proxy', async (req, res) => {
+  console.log('Received POST /api/chat-proxy');
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  const isLocal = process.env.IS_LOCAL === 'true';
+  if (isLocal) {
+    console.log('IS_LOCAL is true, returning stubbed LLM response from file.');
+    const stubPath = __dirname + '/api/stubbed-llm-response.txt';
+    let content;
+    try {
+      content = fs.readFileSync(stubPath, 'utf8');
+    } catch (e) {
+      console.error('Failed to read stubbed response file:', e);
+      return res.status(500).json({ error: 'Failed to read stubbed response file', details: e.message });
+    }
+    return res.status(200).json({
+      choices: [{ message: { content } }]
+    });
+  }
   if (!apiKey) {
-    console.error('Hugging Face API key not configured');
-    return res.status(500).json({ error: 'Hugging Face API key not configured' });
+    console.error('API key not configured');
+    return res.status(500).json({ error: 'API key not configured' });
   }
   try {
-    // Accept both OpenAI-style and Hugging Face-style requests
-    let prompt = req.body?.inputs;
-    if (!prompt && req.body?.messages) {
-      prompt = req.body.messages.map(m => m.content).join('\n');
-    }
-    if (!prompt) {
-      prompt = req.body.prompt;
-    }
-    if (!prompt) {
-      return res.status(400).json({ error: 'No prompt provided' });
-    }
-    // Model selection is now only here in the API
-    // 'MiriFur/gpt2-recipes' - no
-    // 'alexdseo/RecipeBERT' - no
-    // 'meta-llama/Llama-3.1-8B-Instruct'  - slow 
-    // meta-llama/Llama-3.3-70B-Instruct - slow 
-    // mistralai/Mixtral-8x7B-Instruct-v0.1
-    // Gensyn/Qwen2.5-1.5B-Instruct - no 
-    // Gensyn/Qwen2.5-0.5B-Instruct - no 
-    // Qwen/Qwen3-32B 
-    // Qwen/Qwen2.5-Coder-32B-Instruct
-    // deepseek-ai/DeepSeek-R1 - no 
-    const model = 'meta-llama/Llama-3.3-70B-Instruct';
-
-    console.log('Proxying request to Hugging Face:', { model, prompt });
-    const hfRes = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({ inputs: prompt })
-    });
-    let data;
-    const text = await hfRes.text();
-    if (hfRes.status === 404) {
-      console.error('Model not found on Hugging Face:', model);
-      res.status(404).json({ error: `Model not found on Hugging Face: ${model}`, details: text });
-      return;
-    }
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      console.error('Non-JSON response from Hugging Face:', text);
-      res.status(hfRes.status).json({ error: 'Non-JSON response from Hugging Face', details: text });
-      return; // Ensure function exits after sending response
-    }
-    console.log('Hugging Face response status:', hfRes.status);
-    console.log('Hugging Face response message:', hfRes.message);
-    console.log('Hugging Face response:', hfRes);
-
-    // Hugging Face returns an array with generated_text
-    if (Array.isArray(data) && data[0]?.generated_text) {
-      res.status(200).json({ choices: [{ message: { content: data[0].generated_text } }] });
+    let messages = req.body.messages;
+    console.log('Request body:', req.body);
+    if (!messages) {
+      let prompt = req.body?.inputs || req.body?.prompt;
+      if (!prompt) {
+        console.warn('No prompt or messages provided');
+        return res.status(400).json({ error: 'No prompt or messages provided' });
+      }
+      messages = [{ role: 'user', content: prompt }];
+      console.log('Converted prompt to messages:', messages);
     } else {
-      res.status(hfRes.status).json(data);
+      console.log('Using provided messages:', messages);
+    }
+
+    const model = 'mistralai/mistral-small-3.2-24b-instruct:free';
+    const headers = {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    };
+    if (process.env.OPENROUTER_REFERER) {
+      headers['HTTP-Referer'] = process.env.OPENROUTER_REFERER;
+    }
+    if (process.env.OPENROUTER_TITLE) {
+      headers['X-Title'] = process.env.OPENROUTER_TITLE;
+    }
+    console.log('Proxying request to OpenRouter:', { model, messages, headers });
+    const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ model, messages })
+    });
+    console.log('OpenRouter response status:', orRes.status);
+    const data = await orRes.json();
+    console.log('OpenRouter response data:', data);
+    if (orRes.ok) {
+      res.status(200).json(data);
+    } else {
+      res.status(orRes.status).json(data);
     }
   } catch (err) {
-    console.error('Hugging Face request failed:', err);
-    res.status(500).json({ error: 'Hugging Face request failed', details: err.message });
+    console.error('OpenRouter request failed:', err);
+    res.status(500).json({ error: 'OpenRouter request failed', details: err.message });
   }
 });
 

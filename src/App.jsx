@@ -40,7 +40,7 @@ export default function App() {
         inputs: prompt
       };
       console.log('[Food Planner] Sending Hugging Face style API request:', requestBody);
-      const response = await fetch('/api/openai-proxy', {
+      const response = await fetch('/api/chat-proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
